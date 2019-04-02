@@ -5,13 +5,15 @@
    .DESCRIPTION
    Takes the content from a target folder, and injects each file into the BranchCache cache
    Only injects files over 64k
+   This and a lot of our scripts rely on BranchCacheTool.exe which can be found here for download: 
+   https://2pintsoftware.com/products/free-tool-branchcachetool/
 
 
    .NOTES
     AUTHOR: 2Pint Software
     EMAIL: support@2pintsoftware.com
     VERSION: 1.0.0.5
-    07/03/2019 
+    02/04/2019 
     
     CHANGE LOG: 
     1.0.0.1 : 02/01/2019  : Initial version of script - after fixing all the bugs in the AH version of course.. :) 
@@ -24,6 +26,8 @@
     -Path (mandatory) Path to the folder containing the files that you want to inject
     -ServerSecret (mandatory) this is the server secret of the BranchCache SERVER (a DP if you are using SCCM)
                               it's in the reg  - HKLM\SOFTWARE\Microsoft\SMS\DP - BranchCacheKey
+							  Use the folllowing PowerShell command to get from your server as hex string:
+							  [System.BitConverter]::ToString((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PeerDist\SecurityManager\Restricted\' -Name Seed).Seed).Replace("-","")
     -Recurse Default $true - do you want to include files in subfolders?
     -GenerateV1 Default $False - on a Windows 10 client you can serve content to Win7 clients if you set this to $true
                                  as we can generate Windows 7 hashes BUT it requires DOUBLE the disk space in the cache
@@ -38,7 +42,8 @@
 
 
     .EXAMPLE
-      -Path .. -Logfile %tmp%\inject.log -ServerSecret %SERVERSECRET% -BufferSize 128000 -UseTmpForCI $true -SleepBase 0 # Use this command line for read only media TS injections
+      -Path .. -Logfile %tmp%\inject.log -ServerSecret %SERVERSECRET% -BufferSize 128000 -UseTmpForCI $true -ShowProgress $true -SleepBase 0 # Use this command line for read only media TS injections
+	  -Path C:\Temmp\MyFolders -Logfile %tmp%\inject.log -ServerSecret 540F1914AAF90BDC30E94EA797C65FF4E844BAC337854A5073EEB77A81D55A72 -BufferSize 8192 -SleepBase 1000 # Use this command line for injection with low CPU
 
    .LINK
     https://2pintsoftware.com
