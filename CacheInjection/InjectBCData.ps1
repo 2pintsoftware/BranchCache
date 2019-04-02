@@ -10,7 +10,7 @@
    .NOTES
     AUTHOR: 2Pint Software
     EMAIL: support@2pintsoftware.com
-    VERSION: 1.0.0.4
+    VERSION: 1.0.0.5
     07/03/2019 
     
     CHANGE LOG: 
