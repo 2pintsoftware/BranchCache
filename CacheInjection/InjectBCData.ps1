@@ -42,8 +42,8 @@
 
 
     .EXAMPLE
-      -Path .. -Logfile %tmp%\inject.log -ServerSecret %SERVERSECRET% -BufferSize 128000 -UseTmpForCI $true -ShowProgress $true -SleepBase 0 # Use this command line for read only media TS injections
-	  -Path C:\Temmp\MyFolders -Logfile %tmp%\inject.log -ServerSecret 540F1914AAF90BDC30E94EA797C65FF4E844BAC337854A5073EEB77A81D55A72 -BufferSize 8192 -SleepBase 1000 # Use this command line for injection with low CPU
+     -Path .. -Logfile %tmp%\inject.log -ServerSecret %SERVERSECRET% -BufferSize 128000 -UseTmpForCI $true -ShowProgress $true -SleepBase 0 # Use this command line for read only media TS injections
+     -Path C:\Temmp\MyFolders -Logfile %tmp%\inject.log -ServerSecret 540F1914AAF90BDC30E94EA797C65FF4E844BAC337854A5073EEB77A81D55A72 -BufferSize 8192 -SleepBase 1000 # Use this command line for injection with low CPU
 
    .LINK
     https://2pintsoftware.com
@@ -83,20 +83,30 @@ Function StringToBytes
     
     $strInput = $strInput.Replace("-","");
     $strInput = $strInput.Replace(":","");
-    $bytes = [System.Byte[]]::CreateInstance([System.Byte],$strInput.Length/2);
 
-    [int] $i = 0;  
-    [int] $x = 0;  
+	try
+	{
+		$bytes = [System.Byte[]]::CreateInstance([System.Byte],$strInput.Length/2);
 
-    while ($strInput.Length -gt $i)  
-    {  
-        $lngDecimal = [System.Convert]::ToInt32($strInput.Substring($i, 2), 16);  
-        $bytes[$x] = [System.Convert]::ToByte($lngDecimal);  
-        $i = $i + 2;  
-        ++$x;  
-    }  
+		[int] $i = 0;  
+		[int] $x = 0;  
+
+		while ($strInput.Length -gt $i)  
+		{  
+			$lngDecimal = [System.Convert]::ToInt32($strInput.Substring($i, 2), 16);  
+			$bytes[$x] = [System.Convert]::ToByte($lngDecimal);  
+			$i = $i + 2;  
+			++$x;  
+		}  
     
-    return $bytes;  
+		return $bytes;  
+
+	}
+	catch
+	{
+		Write-Error "Failed to parse valid secret as bytes, check command line. The failing secret is:$strInput"
+		return 0;
+	}
 } 
 
 
@@ -343,10 +353,25 @@ if($ServerSecret -ne "")
 	
     $secrethex = [System.BitConverter]::ToString((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PeerDist\SecurityManager\Restricted\' -Name Seed).Seed).Replace("-","")
     $OldKey = StringToBytes($secrethex);
-        
+    
+	if($OldKey -eq 0)
+	{
+		Write-Error "Could not parse current secret key from registry";
+			 $(TimeStamp) + " : Could not parse current secret key from registry" | Out-File $Logfile -Append 
+		return;
+	}
+
     $(TimeStamp) + " : Changing the Server Secret for the injection to: $ServerSecret" | Out-File $Logfile -Append
 	Write-Debug "Changing the Server Secret for the injection to: $ServerSecret"
     $NewKey = StringToBytes($ServerSecret);
+	if($NewKey -eq 0)
+	{
+		Write-Error "Could not parse secret key from command line";
+		$(TimeStamp) + " : Could not parse secret key from command line" | Out-File $Logfile -Append 
+		return;
+	}
+
+
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PeerDist\SecurityManager\Restricted\' -Name Seed -Value ([byte[]]$NewKey);
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PeerDist\SecurityManager\Restricted\' -Name SeedBackup -Value ([byte[]]$OldKey);
 }
