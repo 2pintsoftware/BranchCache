@@ -21,6 +21,7 @@
     1.0.0.3 : 06/03/2019  : Cleaned up all the PW hard codes, changed sleep logic and input parameters
     1.0.0.4 : 07/03/2019  : Added optional progressbar and force returncode of 0 at the end
     1.0.0.5 : 02/04/2019  : Improved logic for server secret to allow dodgy characters
+	1.0.0.6 : 30/12/2019  : Fix for wrong error handling
 
     .USAGE .\InjectBCData.ps1
     -Path (mandatory) Path to the folder containing the files that you want to inject
@@ -364,7 +365,7 @@ if($ServerSecret -ne "")
     $(TimeStamp) + " : Changing the Server Secret for the injection to: $ServerSecret" | Out-File $Logfile -Append
 	Write-Debug "Changing the Server Secret for the injection to: $ServerSecret"
     $NewKey = StringToBytes($ServerSecret);
-	if($NewKey -eq 0)
+	if($NewKey.Length -lt 2)
 	{
 		Write-Error "Could not parse secret key from command line";
 		$(TimeStamp) + " : Could not parse secret key from command line" | Out-File $Logfile -Append 
