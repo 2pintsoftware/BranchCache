@@ -23,7 +23,7 @@
     1.0.0.2 : 18/01/2019  : Added extra logging + .NET Framework check
     1.0.0.3 : 23/01/2019  : Inserted a sleep in the CI Function to try to lower CPU hit
     1.0.0.4 : 24/01/2019  : Changed the space calculation and added 'delete as we go' for the content
-    1.0.0.5 : 13/02/2019  : Added reg key removal which was preventing SCCM site re-assignment/ change logfile location to c:\adidas
+    1.0.0.5 : 13/02/2019  : Added reg key removal which was preventing SCCM site re-assignment/ change logfile location to c:\work
     1.0.0.6 : 15/02/2019  : Removed StifleR Client install
     1.0.0.7 : 15/02/2019  : Now removes unwanted files first - including SUP over 90 days, and then checks Content IDs agains a whitelist
     1.0.0.8 : 19/03/2019  : Changed the Unzip function - now does unzip and delete (if no errorlevel)
@@ -37,7 +37,7 @@
 # SETUP VARIABLES
 #=======================================
 #delete any existing logfile if it exists
-$Logfile = "C:\adidas\AdaptivaBranchCache.log"
+$Logfile = "C:\work\AdaptivaBranchCache.log"
 If (Test-Path $Logfile){ri $Logfile -Force -ErrorAction SilentlyContinue -Confirm:$false}
 If (!(Test-Path $Logfile)){New-Item -ItemType File -Force -Path $Logfile -ErrorAction SilentlyContinue -Confirm:$false}
 if(!$PSScriptRoot){ $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent}
@@ -116,7 +116,7 @@ Function BCInjector
 	$exe = "$PSScriptRoot\BranchCacheTool.exe"
 	# $debugpreference = "Continue"
 	$netsh = "$Env:windir\System32\netsh.exe"
-	$Logfile = "C:\adidas\BranchCacheInjector.log"
+	$Logfile = "C:\work\BranchCacheInjector.log"
 
 
 	#=======================================
