@@ -1,10 +1,11 @@
 {
   "ExpandedNodes": [
     "",
+    "\\CacheInjection",
     "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache",
     "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache\\Import File",
     "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache\\Source"
   ],
-  "SelectedNode": "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache\\Source\\MAIN_REMEDIATE.ps1",
+  "SelectedNode": "\\CacheInjection\\InjectBCData.ps1",
   "PreviewInSolutionExplorer": false
 }
