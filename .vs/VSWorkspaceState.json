@@ -1,11 +1,10 @@
 {
   "ExpandedNodes": [
     "",
-    "\\CacheInjection",
-    "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache",
     "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache\\Import File",
-    "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache\\Source"
+    "\\ConfigMgr Configuration Item (CI) to Enable and Tune BranchCache\\Source",
+    "\\MigrationFromLegacyP2P"
   ],
-  "SelectedNode": "\\CacheInjection\\InjectBCData.ps1",
+  "SelectedNode": "\\MigrationFromLegacyP2P\\AdaptivaBranchCache.ps1",
   "PreviewInSolutionExplorer": false
 }

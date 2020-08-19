@@ -22,6 +22,7 @@
     1.0.0.4 : 07/03/2019  : Added optional progressbar and force returncode of 0 at the end
     1.0.0.5 : 02/04/2019  : Improved logic for server secret to allow dodgy characters
 	1.0.0.6 : 30/12/2019  : Fix for wrong error handling
+	1.0.0.7 : 19/08/2020  : Fixed error handling for TSProgressUI when it has failed to register
 
     .USAGE .\InjectBCData.ps1
     -Path (mandatory) Path to the folder containing the files that you want to inject
@@ -417,21 +418,24 @@ if($ShowProgress -eq $true)
 {
     try
     {
-        $TSPrg = New-Object -ComObject Microsoft.SMS.TSProgressUI
+		$TsEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+        
         try
         {
-            $TsEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+			$TSPrg = New-Object -ComObject Microsoft.SMS.TSProgressUI    
             $UseTSPrg = $true;
         }
         catch
         {
-            throw "Unable to connect to the Task Sequence Environment! Please verify you are in a running Task Sequence Environment.`n`nErrorDetails:`n$_"
+			Write-Warning "Unable to connect to the Task Sequence Progress UI! Please verify you are in a running Task Sequence Environment. Please note: TSProgressUI cannot be loaded during a prestart command.`n`nErrorDetails:`n$_"
+			#Reset to avoid flooding the log file
+			$ShowProgress = $false
         }
-    
     }
     catch
     {
-        throw "Unable to connect to the Task Sequence Progress UI! Please verify you are in a running Task Sequence Environment. Please note: TSProgressUI cannot be loaded during a prestart command.`n`nErrorDetails:`n$_"
+		#We throw and exit if we are not part of a TS
+        throw "Unable to connect to the Task Sequence Environment! Please verify you are in a running Task Sequence Environment.`n`nErrorDetails:`n$_"
     }
 }
 
