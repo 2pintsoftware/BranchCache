@@ -1,4 +1,4 @@
-﻿<# 
+<# 
    .SYNOPSIS 
     Checks size of branchcache
 
@@ -9,27 +9,42 @@
    .NOTES
     AUTHOR: 2Pint Software
     EMAIL: support@2pintsoftware.com
-    VERSION: 1.0.0.2
-    DATE:10/06/2018 
+    TUNER VERSION: 1.0.1.3
+    DATE:23 March 2021
     
     CHANGE LOG: 
     1.0.0.0 : 12/10/2017  : Initial version of script 
     1.0.0.2 : 10/06/2018  : Added a bit more logging
+    1.0.0.3 : 8/7/2020    : Added support for Windows Server and improved logging
+    1.0.0.4 : 5/3/2021    : Changes to support non-English languages
+
 
    .LINK
     https://2pintsoftware.com
 #> 
 
-Function TimeStamp {$(Get-Date -UFormat %T)} 
-$Logfile = "$ENV:TEMP\BCTuner_Cache_Discovery00.log"
-#delete any existing logfile if it exists
-If (Test-Path $Logfile){ri $Logfile -Force -ErrorAction SilentlyContinue -Confirm:$false}
+
+$Logfile = "C:\Windows\Temp\BCTuner_Cache_Discovery.log"
+
+# Delete any existing logfile if it exists
+If (Test-Path $Logfile){Remove-Item $Logfile -Force -ErrorAction SilentlyContinue -Confirm:$false}
+
+Function Write-Log{
+	param (
+    [Parameter(Mandatory = $true)]
+    [string]$Message
+   )
+
+   $TimeGenerated = $(Get-Date -UFormat "%D %T")
+   $Line = "$TimeGenerated : $Message"
+   Add-Content -Value $Line -Path $LogFile -Encoding Ascii
+
+}
 
 #=======================================
 # Get the free space on the system disk as %
 #=======================================
-Function Get-FreeSystemDiskspace
-{
+Function Get-FreeSystemDiskspace{
     # Get the free space from WMI and return as %
     $SystemDrive = Get-WmiObject Win32_LogicalDisk  -Filter "DeviceID='$env:SystemDrive'"
     [int]$ReturnVal = $Systemdrive.FreeSpace*100/$Systemdrive.Size
@@ -42,16 +57,14 @@ Function Get-FreeSystemDiskspace
 #=============================================================================
 # Selects the best cache size based on free diskspace - EDIT THE DEFAULTS HERE
 #=============================================================================
-Function Check-BranchCachesize
-{
+Function Check-BranchCachesize{
     param([int]$CurrentFreeSpace)
-    begin
-    {
-        switch($CurrentFreeSpace)
-        {
-            {$_ -lt 10}{$NewCachePercent = 2} #if less than 10% new cache should be 2%
-            {$_ -lt 50 -and $_ -ge 10}{$NewCachePercent = 5} #if less than 50%  but more than 10% new cache should be 5%
-            {$_ -ge 50}{$NewCachePercent = 10}#if more than 50% new cache should be 10%
+    begin{
+        switch($CurrentFreeSpace){
+            {$_ -lt 10 -and $_ -ge 5}{$NewCachePercent = 5} #if less than 10% but more than 5% new cache should be 5%
+            {$_ -lt 50 -and $_ -ge 10}{$NewCachePercent = 10} #if less than 50%  but more than 10% new cache should be 10%
+            {$_ -lt 75 -and $_ -ge 50}{$NewCachePercent = 20}##if less than 75% but more than 50% new cache should be 20%
+            {$_ -ge 75}{$NewCachePercent = 50}##if more than 75% new cache should be 50%
             default{$NewCachePercent = 5}#default value
         }
     Return $NewCachePercent
@@ -60,8 +73,7 @@ Function Check-BranchCachesize
 #==============
 # End Function
 #==============
-$(TimeStamp) + " : BC Cache Size Check is Running   " | Out-File $Logfile -Append
-
+Write-Log "BC Cache Size Check is Running"
 
 # First we assume the client is compliant
 $Compliance = "Compliant"
@@ -72,16 +84,22 @@ $Compliance = "Compliant"
 $FreeSpaceAvailable = Get-FreeSystemDiskspace
 $CacheSize  = Check-BranchCachesize -CurrentFreeSpace $FreeSpaceAvailable
 
-$(TimeStamp) + " : Free Space Check Returned:   " + $FreeSpaceAvailable + "%" | Out-File $Logfile -Append
-$(TimeStamp) + " : Cache size should be:   " + $CacheSize + "%" | Out-File $Logfile -Append
+Write-Log "Free Space Check Returned: $FreeSpaceAvailable %" 
+Write-Log "BranchCache Cache size should be: $CacheSize %"
 
 #==============================================================
 # Call netsh to carry out a match against the status
 #==============================================================
-$ShowStatusAllCommand = {netsh branchcache show status all}
-$ShowStatusAll = Invoke-Command -ScriptBlock $ShowStatusAllCommand
+Write-Log "Checking current Cache size by running netsh cmd"
+Write-Log "netsh output:"
+$ShowStatusLocalCmd = {netsh branchcache show localcache}
+$ShowStatus = Invoke-Command -ScriptBlock $ShowStatusLocalCmd
+#need to convert the array to string for the logging
+$ShowStatusString = $ShowStatus | Out-String
+Write-Log $ShowStatusString
+
 # Checking cache size has been set
-if(@($ShowStatusAll | Select-String -SimpleMatch -Pattern "Maximum Cache Size")[0].ToString() -match "$CacheSize% of hard disk")
+if(@($ShowStatus | Select-String -SimpleMatch -Pattern "%")[0].ToString() -match "$CacheSize%")
 {
     $Compliance = "Compliant"
 }
@@ -90,5 +108,5 @@ else
     $Compliance = "Non-Compliant"
 }
 
-$(TimeStamp) + " : BC Cache Size Check Returned:   " + $Compliance | Out-File $Logfile -Append
-$Compliance
+Write-Log "BC Cache Size Check Returned: $Compliance"
+Return $Compliance
