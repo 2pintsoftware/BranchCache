@@ -392,10 +392,15 @@ $params = @{ $action = $false }}
 
 
 $directory = Get-Item $Path
-If ($V2Capable){$files = $directory | Get-ChildItem -File @params}
-Else
-#W7 version - Get-ChildItem doesn't support the -file parameter
-{$files = $directory | Get-ChildItem @params | Where-Object { !$_.PSIsContainer }}
+if ($V2Capable) 
+{
+    $files = @($directory | Get-ChildItem -File @params)
+}
+else
+{
+    #W7 version - Get-ChildItem doesn't support the -file parameter
+    $files = @($directory | Get-ChildItem @params | Where-Object { !$_.PSIsContainer })
+}
 
 #check that there is actual content - if not - quit
 if($files.Length -gt 0)
