@@ -357,10 +357,10 @@ if($ServerSecret -ne "")
     $secrethex = [System.BitConverter]::ToString((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PeerDist\SecurityManager\Restricted\' -Name Seed).Seed).Replace("-","")
     $OldKey = StringToBytes($secrethex);
     
-	if($OldKey -eq 0)
+	if($OldKey.Length -eq 0)
 	{
 		Write-Error "Could not parse current secret key from registry";
-			 $(TimeStamp) + " : Could not parse current secret key from registry" | Out-File $Logfile -Append 
+        $(TimeStamp) + " : Could not parse current secret key from registry" | Out-File $Logfile -Append 
 		return;
 	}
 
