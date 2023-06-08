@@ -360,7 +360,7 @@ if($ServerSecret -ne "")
 	if($OldKey.Length -eq 0)
 	{
 		Write-Error "Could not parse current secret key from registry";
-			 $(TimeStamp) + " : Could not parse current secret key from registry" | Out-File $Logfile -Append 
+        $(TimeStamp) + " : Could not parse current secret key from registry" | Out-File $Logfile -Append 
 		return;
 	}
 
@@ -392,10 +392,15 @@ $params = @{ $action = $false }}
 
 
 $directory = Get-Item $Path
-If ($V2Capable){$files = $directory | Get-ChildItem -File @params}
-Else
-#W7 version - Get-ChildItem doesn't support the -file parameter
-{$files = $directory | Get-ChildItem @params | Where-Object { !$_.PSIsContainer }}
+if ($V2Capable) 
+{
+    $files = @($directory | Get-ChildItem -File @params)
+}
+else
+{
+    #W7 version - Get-ChildItem doesn't support the -file parameter
+    $files = @($directory | Get-ChildItem @params | Where-Object { !$_.PSIsContainer })
+}
 
 #check that there is actual content - if not - quit
 if($files.Length -gt 0)
