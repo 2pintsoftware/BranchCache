@@ -22,8 +22,8 @@
     1.0.0.3 : 06/03/2019  : Cleaned up all the PW hard codes, changed sleep logic and input parameters
     1.0.0.4 : 07/03/2019  : Added optional progressbar and force returncode of 0 at the end
     1.0.0.5 : 02/04/2019  : Improved logic for server secret to allow dodgy characters
-	1.0.0.6 : 30/12/2019  : Fix for wrong error handling
-	1.0.0.7 : 19/08/2020  : Fixed error handling for TSProgressUI when it has failed to register
+    1.0.0.6 : 30/12/2019  : Fix for wrong error handling
+    1.0.0.7 : 19/08/2020  : Fixed error handling for TSProgressUI when it has failed to register
     1.0.0.8 : 13/06/2023  : Merged fixes from Maik Koster and added additional logging.
 
     .USAGE .\InjectBCData.ps1
