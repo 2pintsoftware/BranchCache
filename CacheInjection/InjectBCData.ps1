@@ -12,8 +12,8 @@
    .NOTES
     AUTHOR: 2Pint Software
     EMAIL: support@2pintsoftware.com
-    VERSION: 1.0.0.8
-    13/06/2023 
+    VERSION: 1.0.0.9
+    22/06/2023 
     
     CHANGE LOG: 
 
@@ -25,6 +25,7 @@
     1.0.0.6 : 30/12/2019  : Fix for wrong error handling
     1.0.0.7 : 19/08/2020  : Fixed error handling for TSProgressUI when it has failed to register
     1.0.0.8 : 13/06/2023  : Merged fixes from Maik Koster and added additional logging.
+    1.0.0.9 : 22/06/2023  : Capture output of BranchcacheTool.exe into logfile
 
     .USAGE .\InjectBCData.ps1
     -Path (mandatory) Path to the folder containing the files that you want to inject
@@ -147,12 +148,20 @@ Function New-CI {
 
         $Guid = [guid]::NewGuid();
 		
-        $exeargs = @("/PublishCI", "/InputDataFile", "$FilePath", "/ContentID", "$Guid", "/OutputCIFile", "$CIPath", "/CIVersion", "$CIVersion", "/Quiet")
+        if($DebugPreference -eq "Continue"){
+            $exeargs = @("/PublishCI", "/InputDataFile", "$FilePath", "/ContentID", "$Guid", "/OutputCIFile", "$CIPath", "/CIVersion", "$CIVersion")
+        } else {
+            $exeargs = @("/PublishCI", "/InputDataFile", "$FilePath", "/ContentID", "$Guid", "/OutputCIFile", "$CIPath", "/CIVersion", "$CIVersion", "/Quiet")
+        }
+        
 
         Write-Debug "Executing $exe with arguments $exeargs"
 
         #Genereate the CI with BranchCacheTool.exe
-        &$exe $exeargs
+        $output = Get-ProcessOutput -FileName $exe -Args $exeargs
+        $(TimeStamp) + " : $($output.StandardOutput)" | Out-File $Logfile -Append
+        if($output.StandardError) {$(TimeStamp) + " : $($output.StandardError)" | Out-File $Logfile -Append}
+        # &$exe $exeargs
 
         $(TimeStamp) + " : Finished Generation of CI file: $CIPath " | Out-File $Logfile -Append
         Write-Verbose "$($MyInvocation.MyCommand.Name):: Finished Generation of file: $CIPath"
@@ -198,10 +207,17 @@ function Add-BCData {
             $CIContent = Get-Item -Path $CIPath
             if ($CIContent.Length -gt 0) {
                 #We have data in both files, inject it
-                $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "$FilePath", "/InputCIFile", "$CIPath", "/Quiet")
-				
+                if($DebugPreference -eq "Continue"){
+                    $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "$FilePath", "/InputCIFile", "$CIPath")
+                } else {
+                    $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "$FilePath", "/InputCIFile", "$CIPath", "/Quiet")
+                }
                 Write-Debug "Executing $exe with arguments $exeargs"
-                &$exe $exeargs
+                $output = Get-ProcessOutput -FileName $exe -Args $exeargs
+                $(TimeStamp) + " : $($output.StandardOutput)" | Out-File $Logfile -Append
+                if($output.StandardError) {$(TimeStamp) + " : $($output.StandardError)" | Out-File $Logfile -Append}
+
+                # &$exe $exeargs
 				
             }
             else {
@@ -297,6 +313,35 @@ function InjectData {
     End
     { Write-Verbose "$($MyInvocation.MyCommand.Name):: Function ended" }
 }
+
+function Get-ProcessOutput
+{
+    Param (
+                [Parameter(Mandatory=$true)]$FileName,
+                $Args
+    )
+    
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.FileName = $FileName
+    if($Args) { $process.StartInfo.Arguments = $Args }
+    $out = $process.Start()
+    
+    $StandardError = $process.StandardError.ReadToEnd()
+    $StandardOutput = $process.StandardOutput.ReadToEnd()
+    
+    $output = New-Object PSObject
+    $output | Add-Member -type NoteProperty -name StandardOutput -Value $StandardOutput
+    $output | Add-Member -type NoteProperty -name StandardError -Value $StandardError
+    return $output
+}
+
+
+#$output = Get-ProcessOutput -FileName "cmd.exe" -Args "/c ping localhost"
+#Write-Host -ForegroundColor green $output.StandardOutput
+#Write-Host -ForegroundColor red $output.StandardError
 
 if (!$PSScriptRoot) { $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent }
 # Check if script is run in x86 or x64 context
