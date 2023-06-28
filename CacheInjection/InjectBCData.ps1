@@ -149,9 +149,9 @@ Function New-CI {
         $Guid = [guid]::NewGuid();
 		
         if($DebugPreference -eq "Continue"){
-            $exeargs = @("/PublishCI", "/InputDataFile", "$FilePath", "/ContentID", "$Guid", "/OutputCIFile", "$CIPath", "/CIVersion", "$CIVersion")
+            $exeargs = @("/PublishCI", "/InputDataFile", "`"$FilePath`"", "/ContentID", "$Guid", "/OutputCIFile", "`"$CIPath`"", "/CIVersion", "$CIVersion")
         } else {
-            $exeargs = @("/PublishCI", "/InputDataFile", "$FilePath", "/ContentID", "$Guid", "/OutputCIFile", "$CIPath", "/CIVersion", "$CIVersion", "/Quiet")
+            $exeargs = @("/PublishCI", "/InputDataFile", "`"$FilePath`"", "/ContentID", "$Guid", "/OutputCIFile", "`"$CIPath`"", "/CIVersion", "$CIVersion", "/Quiet")
         }
         
 
@@ -208,9 +208,9 @@ function Add-BCData {
             if ($CIContent.Length -gt 0) {
                 #We have data in both files, inject it
                 if($DebugPreference -eq "Continue"){
-                    $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "$FilePath", "/InputCIFile", "$CIPath")
+                    $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "`"$FilePath`"", "/InputCIFile", "`"$CIPath`"")
                 } else {
-                    $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "$FilePath", "/InputCIFile", "$CIPath", "/Quiet")
+                    $exeargs = @("/AddData", "/BufferSizeBytes", $Buffersize, "/InputDataFile", "`"$FilePath`"", "/InputCIFile", "`"$CIPath`"", "/Quiet")
                 }
                 Write-Debug "Executing $exe with arguments $exeargs"
                 $output = Get-ProcessOutput -FileName $exe -Args $exeargs
