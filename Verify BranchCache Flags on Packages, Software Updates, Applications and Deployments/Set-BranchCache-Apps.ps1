@@ -322,43 +322,7 @@ function set-DefaultLogPath
 #endregion LogFunctions
 
 #region ScriptFunctions
-function Get-ExecuteWqlQuery($SiteServer, $query)
-{
-  $returnValue = $null
-  $connectionManager = new-object Microsoft.ConfigurationManagement.ManagementProvider.WqlQueryEngine.WqlConnectionManager
-  if($connectionManager.Connect($SiteServer))
-    {
-      $result = $connectionManager.QueryProcessor.ExecuteQuery($query)
-      foreach($i in $result.GetEnumerator())
-      {
-      $returnValue = $i
-      break
-      }
-      $connectionManager.Dispose()
-  }
-    $returnValue
-}
 
-function Get-ApplicationObjectFromServer($appName,$SiteServer)
-
-{
-    $resultObject = Get-ExecuteWqlQuery $SiteServer "select thissitecode from sms_identification"
-    $siteCode = $resultObject["thissitecode"].StringValue
-    $path = [string]::Format("\\{0}\ROOT\sms\site_{1}", $SiteServer, $siteCode)
-    $scope = new-object System.Management.ManagementScope -ArgumentList $path
-    $query = [string]::Format("select * from sms_application where LocalizedDisplayName='{0}' AND ISLatest='true'", $appName.Trim())
-    $oQuery = new-object System.Management.ObjectQuery -ArgumentList $query
-    $obectSearcher = new-object System.Management.ManagementObjectSearcher -ArgumentList $scope,$oQuery
-    $applicationFoundInCollection = $obectSearcher.Get()
-    $applicationFoundInCollectionEnumerator = $applicationFoundInCollection.GetEnumerator()
-    if($applicationFoundInCollectionEnumerator.MoveNext())
-    {
-       $returnValue = $applicationFoundInCollectionEnumerator.Current
-        $getResult = $returnValue.Get()
-        $sdmPackageXml = $returnValue.Properties["SDMPackageXML"].Value.ToString()
-        [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::DeserializeFromString($sdmPackageXml)
-    }
-}
 #EndRegion ScriptFunctions
 
 }
@@ -390,127 +354,117 @@ process{
 	    Write-Warning -Message "Unable to load required ApplicationManagement dll's. Make sure that you're running this tool on system where the ConfigMgr console is installed and that you're running the tool elevated" ; break
     }
 
-
-if($Mode -eq "Enable"){
-    if($AppName){
+    if ($AppName) {
+        Write-Log -Message "The option to only return an application with a specific name '$AppName' was selected. Retrieving that application..."
         $applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest -and $_.LocalizedDisplayName -like $AppName -and $_.HasContent -eq $true}
-        if($applications -eq $null){
-            Write-Log -Message "ERROR - NO application meets the criteria of HAVING content, and having this specific name script will exit" -LogLevel 3
+        if ($Applications -eq $null) {
+            Write-Log -Message "ERROR - NO application meets the criteria of HAVING content, and having this specific name. Script will exit" -LogLevel 3
+            Set-Location -Path $StartingLocation
+            break
+        }
+    } else {
+        Write-Log -Message "The option to return all applications was selected. Retriving all application..."
+        $Applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest -and $_.HasContent -eq $true}
+        if ($Applications -eq $null) {
+            Write-Log -Message "ERROR - NO application meets the criteria of HAVING content. Script will exit" -LogLevel 3
             Set-Location -Path $StartingLocation
             break
         }
     }
-    if(!($AppName)){
-        $applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest -and $_.HasContent -eq $true}
-        if($applications -eq $null){
-            Write-Log -Message "ERROR - NO application meets the criteria of HAVING content, and having this specific name script will exit" -LogLevel 3
-            Set-Location -Path $StartingLocation
-            break
-        }
-    }
-    ForEach ($Application in $Applications){
-        [int]$currentItem = [array]::indexof($Applications,$Application)
-        Write-Progress -Activity "ENABLING BranchCache App Deployment Types for Application ($($CurrentItem + 1) of $(($Applications | Measure-Object).Count)) - $([math]::round((($currentItem + 1)/($Applications.Count + 1)),2) * 100)% " -Status "Currently ENABLING Deployment Types for - $($Application.LocalizedDisplayName)" -PercentComplete $([float](($currentItem + 1)/($Applications.Count + 1)) * 100)            
-        $ApplicationName = $Application.LocalizedDisplayName
-        $applicationXML = Get-ApplicationObjectFromServer "$($ApplicationName)" $SiteServer
-        if ($applicationXML.DeploymentTypes -ne $null)
-            {
-                foreach ($a in $applicationXML.DeploymentTypes)
-                    {
-                        write-log -Message "Working On: $($ApplicationName)" -LogLevel 1
-                        #change content properties
-                        $a.Installer.Contents[0].PeerCache = $true # enable BranchCache
+
+    if ($Mode -eq "Enable") {
+        ForEach ($Application in $Applications) {
+            $Application.Get()
+            [int]$CurrentItem = [array]::indexof($Applications,$Application)
+            Write-Progress -Activity "ENABLING BranchCache App Deployment Types for Application ($($CurrentItem + 1) of $(($Applications | Measure-Object).Count)) - $([math]::round((($currentItem + 1)/($Applications.Count + 1)),2) * 100)% " -Status "Currently ENABLING Deployment Types for - $($Application.LocalizedDisplayName)" -PercentComplete $([float](($currentItem + 1)/($Applications.Count + 1)) * 100)
+            $ApplicationName = $Application.LocalizedDisplayName
+            $ApplicationXML = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::DeserializeFromString($application.SDMPackageXML)
+            $UpdateApplication = $false
+            if ($ApplicationXML.DeploymentTypes -ne $null) {
+                foreach ($DeploymentType in $ApplicationXML.DeploymentTypes) {
+                    if ($DeploymentType.Installer.Contents.Location -ne $null) {
+                        if ($DeploymentType.Installer.Contents.PeerCache -eq $false) {
+                            Write-Log -Message "$($DeploymentType.Title) : Enabling BranchCache" -LogLevel 1
+                            $DeploymentType.Installer.Contents[0].PeerCache = $true # enable BranchCache
+                            $UpdateApplication = $true
+                        } else {
+                            Write-Log -Message "$($DeploymentType.Title) : BranchCache is enabled" -LogLevel 1
+                        }
                     }
+                }
             }
-        $newappxml = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::Serialize($applicationXML, $false)
-        $application.SDMPackageXML = $newappxml
-        $application.Put() | Out-Null
-    }
-        write-log -message "Done! Happy BranchCache-ing" -LogLevel 1
-}
-
-if($Mode -eq "Gather"){
-    if($AppName){
-        $applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest -and $_.LocalizedDisplayName -like $AppName}
-    }
-    if(!($AppName)){
-        $applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest}
+            if ($UpdateApplication) {
+                $NewApplicationXml = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::Serialize($ApplicationXML, $false)
+                $Application.SDMPackageXML = $NewApplicationXml
+                $Application.Put() | Out-Null
+            }
+        }
+            write-log -message "Done! Happy BranchCache-ing" -LogLevel 1
     }
 
-    $NumberOfBCEnabledApplications = 0
-    $NumberOfBCDisabledApplications = 0
+    if ($Mode -eq "Gather") {
+        $NumberOfBCEnabledApplications = 0
+        $NumberOfBCDisabledApplications = 0
 
-    ForEach ($Application in $Applications) {
-        $Application.Get()
-        [int]$currentItem = [array]::indexof($Applications,$Application)
-        Write-Progress -Activity "GATHERING BranchCache App Deployment Types for Application ($($CurrentItem + 1) of $(($Applications | Measure-Object).Count)) - $([math]::round((($currentItem + 1)/($Applications.Count + 1)),2) * 100)% " -Status "Currently GATHERING Deployment Types for - $($Application.LocalizedDisplayName)" -PercentComplete $([float](($currentItem + 1)/($Applications.Count + 1)) * 100)
-        $DeploymentTypes = ([Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::DeserializeFromString($application.SDMPackageXML)).DeploymentTypes
-        If ($DeploymentTypes -ne $null) {
-            Foreach ($DeploymentType in $DeploymentTypes) {
-                If ($DeploymentType.Installer.Contents.Location -ne $null) {
-                    If ($DeploymentType.Installer.Contents.PeerCache -eq $True) {
-                        Write-Log -Message "$($DeploymentType.Title) : BranchCache is enabled" -LogLevel 1
-                        $NumberOfBCEnabledApplications++
+        ForEach ($Application in $Applications) {
+            $Application.Get()
+            [int]$CurrentItem = [array]::indexof($Applications,$Application)
+            Write-Progress -Activity "GATHERING BranchCache App Deployment Types for Application ($($CurrentItem + 1) of $(($Applications | Measure-Object).Count)) - $([math]::round((($currentItem + 1)/($Applications.Count + 1)),2) * 100)% " -Status "Currently GATHERING Deployment Types for - $($Application.LocalizedDisplayName)" -PercentComplete $([float](($currentItem + 1)/($Applications.Count + 1)) * 100)
+            $DeploymentTypes = ([Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::DeserializeFromString($application.SDMPackageXML)).DeploymentTypes
+            if ($DeploymentTypes -ne $null) {
+                Foreach ($DeploymentType in $DeploymentTypes) {
+                    if ($DeploymentType.Installer.Contents.Location -ne $null) {
+                        if ($DeploymentType.Installer.Contents.PeerCache -eq $True) {
+                            Write-Log -Message "$($DeploymentType.Title) : BranchCache is enabled" -LogLevel 1
+                            $NumberOfBCEnabledApplications++
+                        }
+
+                        if ($DeploymentType.Installer.Contents.PeerCache -eq $False) {
+                            Write-Log "$($DeploymentType.Title) : BranchCache is disabled"
+                            $NumberOfBCDisabledApplications++
+                        }
                     }
-
-
-                    If ($DeploymentType.Installer.Contents.PeerCache -eq $False) {
-                        Write-Log "$($DeploymentType.Title) : BranchCache is disabled"
-                        $NumberOfBCDisabledApplications++
-                    }
-
                 }
             }
         }
+
+        Write-Log -Message "Now evaluating Results" -LogLevel 1
+        Write-Log -Message "Total number of applications: $($NumberOfBCEnabledApplications + $NumberOfBCDisabledApplications)" -LogLevel 1
+        Write-Log -Message "Total number of applications with content: $($($Applications | Where-Object {$_.HasContent -eq $True} | Measure-Object).Count)"
+        Write-Log -Message "Total number of applications without Content: $($($Applications | Where-Object {$_.HasContent -eq $False} | Measure-Object).Count)"
+        Write-Log -Message "Number Of BranchCache Enabled applications: $($NumberOfBCEnabledApplications - $($Applications | Where-Object {$_.HasContent -eq $False} | Measure-Object).Count)" -LogLevel 1
+        Write-Log -Message "Number Of BranchCache Disabled applications: $($NumberOfBCDisabledApplications)" -LogLevel 1
     }
 
-    Write-Log -Message "Now evaluating Results" -LogLevel 1
-    Write-Log -Message "Total number of applications: $($NumberOfBCEnabledApplications + $NumberOfBCDisabledApplications)" -LogLevel 1
-    Write-Log -Message "Total number of applications with content: $($($Applications | Where-Object {$_.HasContent -eq $True} | Measure-Object).Count)"
-    Write-Log -Message "Total number of applications without Content: $($($Applications | Where-Object {$_.HasContent -eq $False} | Measure-Object).Count)"
-    Write-Log -Message "Number Of BranchCache Enabled applications: $($NumberOfBCEnabledApplications - $($Applications | Where-Object {$_.HasContent -eq $False} | Measure-Object).Count)" -LogLevel 1
-    Write-Log -Message "Number Of BranchCache Disabled applications: $($NumberOfBCDisabledApplications)" -LogLevel 1
-}
-
-if($Mode -eq "Disable"){
-    if($AppName){
-        Write-Log -Message "The option to only return an application with a specific name was selected retriving that application..."
-        $applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest -and $_.LocalizedDisplayName -like $AppName -and $_.HasContent -eq $true}
-        if($applications -eq $null){
-            Write-Log -Message "ERROR - NO application meets the criteria of HAVING content, and having this specific name script will exit" -LogLevel 3
-            Set-Location -Path $StartingLocation
-            break
-        }
-    }
-    if(!($AppName)){
-        Write-Log -Message "The option to only return all applications with a specific name was selected retriving that application..."
-        $applications = Get-WmiObject SMS_Application -Computername $SiteServer -Namespace root\sms\site_$SiteCode | Where-Object {$_.IsLatest -and $_.HasContent -eq $true}
-        if($applications -eq $null){
-            Write-Log -Message "ERROR - NO application meets the criteria of HAVING content, and having this specific name script will exit" -LogLevel 3
-            Set-Location -Path $StartingLocation
-            break
-        }
-    }
-    ForEach ($Application in $Applications){
-        [int]$currentItem = [array]::indexof($Applications,$Application)
-        Write-Progress -Activity "DISABLING BranchCache App Deployment Types ($($CurrentItem + 1) of $(($Applications | Measure-Object).Count)) - $([math]::round((($currentItem + 1)/($Applications.Count + 1)),2) * 100)% " -Status "Currently DISABLING BranchCache on Deployment Types for - $($Application.LocalizedDisplayName)" -PercentComplete $([float](($currentItem + 1)/($Applications.Count + 1)) * 100)
-        $ApplicationName = $Application.LocalizedDisplayName
-        $applicationXML = Get-ApplicationObjectFromServer "$($ApplicationName)" $SiteServer
-        if ($applicationXML.DeploymentTypes -ne $null)
-            {
-                foreach ($a in $applicationXML.DeploymentTypes)
-                    {
-                    Write-Log -Message "Working On: $($ApplicationName)"
-                        #change content properties
-                        $a.Installer.Contents[0].PeerCache = $false # disable BranchCache
+    if ($Mode -eq "Disable") {
+        ForEach ($Application in $Applications) {
+            $Application.Get()
+            [int]$CurrentItem = [array]::indexof($Applications,$Application)
+            Write-Progress -Activity "DISABLING BranchCache App Deployment Types ($($CurrentItem + 1) of $(($Applications | Measure-Object).Count)) - $([math]::round((($currentItem + 1)/($Applications.Count + 1)),2) * 100)% " -Status "Currently DISABLING BranchCache on Deployment Types for - $($Application.LocalizedDisplayName)" -PercentComplete $([float](($currentItem + 1)/($Applications.Count + 1)) * 100)
+            $ApplicationName = $Application.LocalizedDisplayName
+            $ApplicationXML = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::DeserializeFromString($application.SDMPackageXML)
+            $UpdateApplication = $false
+            if ($ApplicationXML.DeploymentTypes -ne $null) {
+                foreach ($DeploymentType in $ApplicationXML.DeploymentTypes) {
+                    if ($DeploymentType.Installer.Contents.Location -ne $null) {
+                        if ($DeploymentType.Installer.Contents.PeerCache -eq $true) {
+                            Write-Log -Message "$($DeploymentType.Title) : Disabling BranchCache" -LogLevel 1
+                            $DeploymentType.Installer.Contents[0].PeerCache = $false # disable BranchCache
+                            $UpdateApplication = $true
+                        } else {
+                            Write-Log -Message "$($DeploymentType.Title) : BranchCache is disabled" -LogLevel 1
+                        }
                     }
+                }
             }
-        $newappxml = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::Serialize($applicationXML, $false)
-        $application.SDMPackageXML = $newappxml
-        $application.Put() | Out-Null
+            if ($UpdateApplication) {
+                $NewApplicationXml = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::Serialize($ApplicationXML, $false)
+                $Application.SDMPackageXML = $NewApplicationXml
+                $Application.Put() | Out-Null
+            }
+        }
+        Write-Log -Message "Done! We are sad to see you stop caching"
     }
-    Write-Log -Message "Done! We are sad to see you stop caching"
-}
 
-Set-Location -Path $StartingLocation
+    Set-Location -Path $StartingLocation
 }
