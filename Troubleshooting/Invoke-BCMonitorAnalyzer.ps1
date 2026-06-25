@@ -1,9 +1,12 @@
 <#
 .SYNOPSIS
-    Analyzes BranchCache monitoring logs and provides detailed information about peers and events.
+
 
 .DESCRIPTION
-    This script is designed to help administrators analyze BranchCache monitoring logs. It provides a menu-driven interface to clear logs, disable logs, clear the BranchCache cache, and resolve peer information from log events.
+
+
+.PARAMETER LogPath
+
 
 .EXAMPLE
     .\Invoke-BCMonitorAnalyzer.ps1
@@ -411,22 +414,32 @@ function Analyze-BCMonitorLog {
         }
     }
 
-    $peerTable = $interestingEvents |
+    $peerResponseCounts = @{}
+    $interestingEvents |
         Where-Object { $_.Id -eq 115 -and $_.HostName } |
         ForEach-Object {
             Resolve-BCMonitorPeer -Endpoint $_.HostName -Cache $peerCache
         } |
         Group-Object Endpoint |
         ForEach-Object {
+            $peerResponseCounts[$_.Name] = $_.Count
+        }
+
+    $peerTable = $packageAnalysis |
+        Where-Object { $_.Source -eq 'Peers' } |
+        Group-Object PeerEndpoint |
+        ForEach-Object {
             $first = $_.Group | Select-Object -First 1
+            $endpoint = if ([string]::IsNullOrWhiteSpace([string]$_.Name)) { '(unknown)' } else { [string]$_.Name }
             [pscustomobject]@{
                 PackagesReceived = $_.Count
-                IPAddress        = $first.Address
+                PeerResponses    = if ($peerResponseCounts.ContainsKey($endpoint)) { $peerResponseCounts[$endpoint] } else { 0 }
+                IPAddress        = if ($first.PeerAddress) { $first.PeerAddress } else { '(unknown)' }
                 ResolvedName     = if ($first.ResolvedName) { $first.ResolvedName } else { '-' }
-                Endpoint         = $first.Endpoint
+                Endpoint         = $endpoint
             }
         } |
-        Sort-Object -Property PackagesReceived, IPAddress -Descending
+        Sort-Object -Property PackagesReceived, PeerResponses, IPAddress -Descending
 
     $contentIds = $packageAnalysis | Where-Object { $_.ContentId } | Select-Object -ExpandProperty ContentId -Unique
     $summaryObject = [pscustomobject]@{
