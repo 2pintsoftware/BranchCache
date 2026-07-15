@@ -12,8 +12,8 @@
    .NOTES
     AUTHOR: 2Pint Software
     EMAIL: support@2pintsoftware.com
-    VERSION: 1.0.0.5
-    02/04/2019 
+    VERSION: 1.0.0.8
+    07/13/2026
     
     CHANGE LOG: 
 
@@ -24,6 +24,7 @@
     1.0.0.5 : 02/04/2019  : Improved logic for server secret to allow dodgy characters
 	1.0.0.6 : 30/12/2019  : Fix for wrong error handling
 	1.0.0.7 : 19/08/2020  : Fixed error handling for TSProgressUI when it has failed to register
+    1.0.0.8 : 07/13/2026  : Fixed issue with files larger than 4 GB (UInt64 vs. UInt32)
 
     .USAGE .\InjectBCData.ps1
     -Path (mandatory) Path to the folder containing the files that you want to inject
@@ -457,7 +458,7 @@ $params = @{ $action = $true }}
 Else {$action = 'DeleteFile'
 $params = @{ $action = $false }}
 $Step = 0;
-[UInt32]$Steps = $files.Length;
+[UInt64]$Steps = $files.Length;
 [UInt64]$V2DataInjected = 0;
 [UInt64]$V1DataInjected = 0;
 
